@@ -4,8 +4,8 @@
 msg_file="$1"
 [ -z "$msg_file" ] || [ ! -f "$msg_file" ] && exit 0
 
-# Remove lines that look like Co-authored-by: Cursor ...
+# Remove Co-authored-by lines from commit messages
 tmp=$(mktemp)
-grep -v -i 'Co-authored-by:.*Cursor' "$msg_file" > "$tmp" && mv "$tmp" "$msg_file"
+grep -v -i '^Co-authored-by:' "$msg_file" > "$tmp" && mv "$tmp" "$msg_file"
 rm -f "$tmp"
 exit 0

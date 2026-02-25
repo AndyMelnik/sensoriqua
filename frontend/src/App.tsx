@@ -558,7 +558,14 @@ export default function App() {
       exportedAt: new Date().toISOString(),
       name: name.trim() || undefined,
       dashboard: {
-        planes: dashboardPlanes.map((p) => ({ configured_sensor_id: p.configured_sensor_id, position_index: p.position_index })),
+        planes: dashboardPlanes.map((p) => ({
+          configured_sensor_id: p.configured_sensor_id,
+          position_index: p.position_index,
+          device_id: p.device_id,
+          sensor_input_label: p.sensor_input_label,
+          sensor_source: p.sensor_source || 'input',
+          object_label: p.object_label,
+        })),
       },
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -572,6 +579,27 @@ export default function App() {
     setExportDashboardName('');
   };
 
+  const findConfiguredForPlane = (
+    p: { configured_sensor_id?: number; device_id?: number; sensor_input_label?: string; sensor_source?: string }
+  ): ConfiguredSensor | undefined => {
+    if (p.configured_sensor_id != null) {
+      const byId = configured.find((c) => c.configured_sensor_id === p.configured_sensor_id);
+      if (byId) return byId;
+    }
+    const deviceId = p.device_id != null ? Number(p.device_id) : NaN;
+    const label = typeof p.sensor_input_label === 'string' ? p.sensor_input_label.trim() : '';
+    const source = (p.sensor_source === 'state' || p.sensor_source === 'tracking' ? p.sensor_source : 'input') as 'input' | 'state' | 'tracking';
+    if (!Number.isNaN(deviceId) && label) {
+      return configured.find(
+        (c) =>
+          c.device_id === deviceId &&
+          c.sensor_input_label === label &&
+          ((c.sensor_source || 'input') === source)
+      );
+    }
+    return undefined;
+  };
+
   const importDashboard = async (file: File) => {
     setError(null);
     try {
@@ -582,29 +610,47 @@ export default function App() {
         setError('Invalid dashboard JSON: expected "dashboard.planes" or "planes" array');
         return;
       }
-      const normalized: { configured_sensor_id: number; position_index: number }[] = [];
+      const normalized: { configured_sensor_id?: number; device_id?: number; sensor_input_label?: string; sensor_source?: string; position_index: number }[] = [];
       for (let i = 0; i < planes.length; i++) {
-        const p = planes[i] as { configured_sensor_id?: unknown; position_index?: unknown };
-        if (!p || typeof p !== 'object') continue;
-        const id = Number(p.configured_sensor_id);
-        if (Number.isNaN(id) || id < 1) continue;
-        const pos = typeof p.position_index === 'number' && !Number.isNaN(p.position_index) ? p.position_index : i;
-        normalized.push({ configured_sensor_id: id, position_index: pos });
+        const raw = planes[i] as Record<string, unknown>;
+        if (!raw || typeof raw !== 'object') continue;
+        const id = Number(raw.configured_sensor_id ?? raw.configuredSensorId);
+        const deviceId = Number(raw.device_id ?? raw.deviceId);
+        const label = typeof (raw.sensor_input_label ?? raw.sensorInputLabel) === 'string' ? (raw.sensor_input_label ?? raw.sensorInputLabel) as string : '';
+        const posRaw = raw.position_index ?? raw.positionIndex;
+        const pos = typeof posRaw === 'number' && !Number.isNaN(posRaw) ? posRaw : i;
+        const hasId = !Number.isNaN(id) && id >= 1;
+        const hasIdentity = !Number.isNaN(deviceId) && label.length > 0;
+        if (hasId || hasIdentity) {
+          normalized.push({
+            ...(hasId && { configured_sensor_id: id }),
+            ...(hasIdentity && { device_id: deviceId, sensor_input_label: label.trim(), sensor_source: (raw.sensor_source ?? raw.sensorSource) === 'state' || (raw.sensor_source ?? raw.sensorSource) === 'tracking' ? (raw.sensor_source ?? raw.sensorSource) as string : 'input' }),
+            position_index: pos,
+          });
+        }
       }
       if (normalized.length === 0) {
-        setError('Invalid dashboard JSON: each plane must have configured_sensor_id (number)');
+        setError('Invalid dashboard JSON: each plane needs configured_sensor_id (number) or device_id + sensor_input_label so it can be matched to your configured sensors.');
+        return;
+      }
+      const matched: { configured_sensor_id: number; position_index: number }[] = [];
+      for (const p of normalized) {
+        const c = findConfiguredForPlane(p);
+        if (c) matched.push({ configured_sensor_id: c.configured_sensor_id, position_index: p.position_index });
+      }
+      if (matched.length === 0) {
+        setError('No panels could be matched to your configured sensors. Add the same sensors to "Configured sensors" first, then import again.');
         return;
       }
       if (useLocalConfig) {
         const newPlanes: DashboardPlane[] = [];
-        for (let i = 0; i < normalized.length; i++) {
-          const p = normalized[i];
-          const c = configured.find((x) => x.configured_sensor_id === p.configured_sensor_id);
-          if (!c) continue;
+        matched.forEach((m, i) => {
+          const c = configured.find((x) => x.configured_sensor_id === m.configured_sensor_id);
+          if (!c) return;
           newPlanes.push({
             dashboard_plane_id: -Date.now() - i,
             configured_sensor_id: c.configured_sensor_id,
-            position_index: p.position_index,
+            position_index: m.position_index,
             object_id: c.object_id,
             device_id: c.device_id,
             sensor_input_label: c.sensor_input_label,
@@ -614,27 +660,25 @@ export default function App() {
             max_threshold: c.max_threshold,
             object_label: c.object_label,
           });
-        }
+        });
         api.setLocalDashboardPlanes(newPlanes);
         await loadDashboard();
-        return;
-      }
-      const configuredIds = new Set(configured.map((c) => c.configured_sensor_id));
-      const missing = normalized.filter((p) => !configuredIds.has(p.configured_sensor_id));
-      if (missing.length > 0) {
-        setError(
-          `Import aborted: ${missing.length} panel(s) reference configured_sensor_id not in your list. Add the matching sensors to "Configured sensors" first, then import again.`
-        );
+        if (matched.length < normalized.length) {
+          setError(`Imported ${matched.length} panel(s). ${normalized.length - matched.length} skipped (no matching sensor in your list).`);
+        }
         return;
       }
       for (const { dashboard_plane_id } of dashboardPlanes) {
         await api.removeDashboardPlane(dashboard_plane_id);
       }
-      for (let i = 0; i < normalized.length; i++) {
-        const p = normalized[i];
-        await api.addDashboardPlane(p.configured_sensor_id, p.position_index);
+      for (let i = 0; i < matched.length; i++) {
+        const m = matched[i];
+        await api.addDashboardPlane(m.configured_sensor_id, m.position_index);
       }
       await loadDashboard();
+      if (matched.length < normalized.length) {
+        setError(`Imported ${matched.length} panel(s). ${normalized.length - matched.length} skipped (no matching sensor in your list).`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
