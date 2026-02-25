@@ -605,7 +605,12 @@ export default function App() {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      const planes = data?.dashboard?.planes ?? data?.planes ?? (Array.isArray(data) ? data : null);
+      const planes =
+        data?.dashboard?.planes ??
+        data?.dashboard?.Planes ??
+        data?.planes ??
+        data?.Planes ??
+        (Array.isArray(data) ? data : null);
       if (!Array.isArray(planes) || planes.length === 0) {
         setError('Invalid dashboard JSON: expected "dashboard.planes" or "planes" array');
         return;
@@ -614,23 +619,26 @@ export default function App() {
       for (let i = 0; i < planes.length; i++) {
         const raw = planes[i] as Record<string, unknown>;
         if (!raw || typeof raw !== 'object') continue;
-        const id = Number(raw.configured_sensor_id ?? raw.configuredSensorId);
-        const deviceId = Number(raw.device_id ?? raw.deviceId);
-        const label = typeof (raw.sensor_input_label ?? raw.sensorInputLabel) === 'string' ? (raw.sensor_input_label ?? raw.sensorInputLabel) as string : '';
-        const posRaw = raw.position_index ?? raw.positionIndex;
+        const idRaw = raw.configured_sensor_id ?? raw.configuredSensorId ?? raw['configured_sensor_id'];
+        const id = typeof idRaw === 'number' && !Number.isNaN(idRaw) ? idRaw : Number(idRaw);
+        const deviceIdRaw = raw.device_id ?? raw.deviceId;
+        const deviceId = typeof deviceIdRaw === 'number' && !Number.isNaN(deviceIdRaw) ? deviceIdRaw : Number(deviceIdRaw);
+        const labelRaw = raw.sensor_input_label ?? raw.sensorInputLabel;
+        const label = typeof labelRaw === 'string' ? labelRaw.trim() : '';
+        const posRaw = raw.position_index ?? raw.positionIndex ?? i;
         const pos = typeof posRaw === 'number' && !Number.isNaN(posRaw) ? posRaw : i;
-        const hasId = !Number.isNaN(id) && id >= 1;
+        const hasId = !Number.isNaN(id) && id >= 0;
         const hasIdentity = !Number.isNaN(deviceId) && label.length > 0;
         if (hasId || hasIdentity) {
           normalized.push({
             ...(hasId && { configured_sensor_id: id }),
-            ...(hasIdentity && { device_id: deviceId, sensor_input_label: label.trim(), sensor_source: (raw.sensor_source ?? raw.sensorSource) === 'state' || (raw.sensor_source ?? raw.sensorSource) === 'tracking' ? (raw.sensor_source ?? raw.sensorSource) as string : 'input' }),
+            ...(hasIdentity && { device_id: deviceId, sensor_input_label: label, sensor_source: (raw.sensor_source ?? raw.sensorSource) === 'state' || (raw.sensor_source ?? raw.sensorSource) === 'tracking' ? (raw.sensor_source ?? raw.sensorSource) as string : 'input' }),
             position_index: pos,
           });
         }
       }
       if (normalized.length === 0) {
-        setError('Invalid dashboard JSON: each plane needs configured_sensor_id (number) or device_id + sensor_input_label so it can be matched to your configured sensors.');
+        setError('Invalid dashboard JSON: each plane must be an object with configured_sensor_id (number) or device_id + sensor_input_label. Re-export the dashboard from the app to get a compatible format.');
         return;
       }
       const matched: { configured_sensor_id: number; position_index: number }[] = [];
