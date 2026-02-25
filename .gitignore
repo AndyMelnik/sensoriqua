@@ -1,0 +1,35 @@
+# Local app state (when using SQLite for configured sensors / dashboard)
+sensoriqua_state.db
+
+# Environment and secrets (never commit; see README and SECURITY.md)
+.env
+.env.local
+.env.*.local
+backend/.env
+*.env
+!*.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node / frontend
+node_modules/
+dist/
+*.local
+
+# Uncomment to ignore built frontend (when building on deploy instead of committing):
+# backend/static/
+
+# Default app state SQLite (configured_sensors, dashboard_planes) when no APP_STATE_DSN set
+backend/sensoriqua_state.db
+
+# IDE / OS
+.idea/
+.DS_Store
+*.swp
+*.swo
