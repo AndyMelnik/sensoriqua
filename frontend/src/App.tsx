@@ -580,17 +580,18 @@ export default function App() {
   };
 
   const findConfiguredForPlane = (
-    p: { configured_sensor_id?: number; device_id?: number; sensor_input_label?: string; sensor_source?: string }
+    p: { configured_sensor_id?: number; device_id?: number; sensor_input_label?: string; sensor_source?: string },
+    list: ConfiguredSensor[] = configured
   ): ConfiguredSensor | undefined => {
     if (p.configured_sensor_id != null) {
-      const byId = configured.find((c) => c.configured_sensor_id === p.configured_sensor_id);
+      const byId = list.find((c) => c.configured_sensor_id === p.configured_sensor_id);
       if (byId) return byId;
     }
     const deviceId = p.device_id != null ? Number(p.device_id) : NaN;
     const label = typeof p.sensor_input_label === 'string' ? p.sensor_input_label.trim() : '';
     const source = (p.sensor_source === 'state' || p.sensor_source === 'tracking' ? p.sensor_source : 'input') as 'input' | 'state' | 'tracking';
     if (!Number.isNaN(deviceId) && label) {
-      return configured.find(
+      return list.find(
         (c) =>
           c.device_id === deviceId &&
           c.sensor_input_label === label &&
@@ -615,7 +616,8 @@ export default function App() {
         setError('Invalid dashboard JSON: expected "dashboard.planes" or "planes" array');
         return;
       }
-      const normalized: { configured_sensor_id?: number; device_id?: number; sensor_input_label?: string; sensor_source?: string; position_index: number }[] = [];
+      type NormalizedPlane = { configured_sensor_id?: number; device_id?: number; sensor_input_label?: string; sensor_source?: string; object_label?: string; position_index: number };
+      const normalized: NormalizedPlane[] = [];
       for (let i = 0; i < planes.length; i++) {
         const raw = planes[i] as Record<string, unknown>;
         if (!raw || typeof raw !== 'object') continue;
@@ -625,35 +627,112 @@ export default function App() {
         const deviceId = typeof deviceIdRaw === 'number' && !Number.isNaN(deviceIdRaw) ? deviceIdRaw : Number(deviceIdRaw);
         const labelRaw = raw.sensor_input_label ?? raw.sensorInputLabel;
         const label = typeof labelRaw === 'string' ? labelRaw.trim() : '';
+        const objectLabel = typeof (raw.object_label ?? raw.objectLabel) === 'string' ? String(raw.object_label ?? raw.objectLabel).trim() : '';
         const posRaw = raw.position_index ?? raw.positionIndex ?? i;
         const pos = typeof posRaw === 'number' && !Number.isNaN(posRaw) ? posRaw : i;
-        const hasId = !Number.isNaN(id) && id >= 0;
+        const hasId = !Number.isNaN(id);
         const hasIdentity = !Number.isNaN(deviceId) && label.length > 0;
         if (hasId || hasIdentity) {
           normalized.push({
             ...(hasId && { configured_sensor_id: id }),
-            ...(hasIdentity && { device_id: deviceId, sensor_input_label: label, sensor_source: (raw.sensor_source ?? raw.sensorSource) === 'state' || (raw.sensor_source ?? raw.sensorSource) === 'tracking' ? (raw.sensor_source ?? raw.sensorSource) as string : 'input' }),
+            ...(hasIdentity && { device_id: deviceId, sensor_input_label: label, sensor_source: (raw.sensor_source ?? raw.sensorSource) === 'state' || (raw.sensor_source ?? raw.sensorSource) === 'tracking' ? (raw.sensor_source ?? raw.sensorSource) as string : 'input', ...(objectLabel && { object_label: objectLabel }) }),
             position_index: pos,
           });
         }
       }
       if (normalized.length === 0) {
-        setError('Invalid dashboard JSON: each plane must be an object with configured_sensor_id (number) or device_id + sensor_input_label. Re-export the dashboard from the app to get a compatible format.');
+        setError('Invalid dashboard JSON: need an array of plane objects with configured_sensor_id and/or position_index.');
         return;
       }
+      const hasAnyIdentity = normalized.some((p) => p.device_id != null && p.sensor_input_label);
+      let currentConfigured = configured;
+      if (hasAnyIdentity) {
+        try {
+          const objectsList = await api.getObjects({ include_grouping_info: true });
+          const deviceToObject: Record<number, { object_id: number; object_label: string }> = {};
+          for (const o of objectsList as { id: number; label: string; device_id: number }[]) {
+            if (o.device_id != null) deviceToObject[o.device_id] = { object_id: o.id, object_label: o.label || '' };
+          }
+          const seen = new Set<string>();
+          const toAdd: NormalizedPlane[] = [];
+          for (const p of normalized) {
+            if (p.device_id == null || !p.sensor_input_label) continue;
+            const key = `${p.device_id}:${p.sensor_input_label}:${p.sensor_source || 'input'}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            if (!findConfiguredForPlane(p, currentConfigured)) toAdd.push(p);
+          }
+          for (const p of toAdd) {
+            const obj = p.device_id != null ? deviceToObject[p.device_id] : null;
+            if (!obj) continue;
+            const customLabel = (p.object_label || p.sensor_input_label || 'Sensor').slice(0, 100);
+            if (useLocalConfig) {
+              const newId = -Date.now() - Math.floor(Math.random() * 1e6);
+              const newC: ConfiguredSensor = {
+                configured_sensor_id: newId,
+                object_id: obj.object_id,
+                device_id: p.device_id!,
+                sensor_input_label: p.sensor_input_label!,
+                sensor_source: p.sensor_source || 'input',
+                sensor_label_custom: customLabel,
+                min_threshold: null,
+                max_threshold: null,
+                object_label: obj.object_label,
+              };
+              currentConfigured = [...currentConfigured, newC];
+              api.setLocalConfiguredSensors(currentConfigured);
+            } else {
+              await api.addConfiguredSensor({
+                object_id: obj.object_id,
+                device_id: p.device_id!,
+                sensor_input_label: p.sensor_input_label!,
+                sensor_source: (p.sensor_source as 'input' | 'state' | 'tracking') || 'input',
+                sensor_label_custom: customLabel,
+                min_threshold: null,
+                max_threshold: null,
+              });
+            }
+          }
+          if (!useLocalConfig && toAdd.length > 0) {
+            currentConfigured = await api.getConfiguredSensors();
+          } else if (useLocalConfig) {
+            currentConfigured = api.getLocalConfiguredSensors() as ConfiguredSensor[];
+          }
+          setConfigured(currentConfigured);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : String(e));
+          return;
+        }
+      }
       const matched: { configured_sensor_id: number; position_index: number }[] = [];
-      for (const p of normalized) {
-        const c = findConfiguredForPlane(p);
+      for (let i = 0; i < normalized.length; i++) {
+        const p = normalized[i];
+        let c = findConfiguredForPlane(p, currentConfigured);
+        if (!c && currentConfigured.length >= normalized.length) {
+          c = currentConfigured[i];
+        }
         if (c) matched.push({ configured_sensor_id: c.configured_sensor_id, position_index: p.position_index });
       }
       if (matched.length === 0) {
-        setError('No panels could be matched to your configured sensors. Add the same sensors to "Configured sensors" first, then import again.');
+        if (currentConfigured.length === 0) {
+          setError(
+            hasAnyIdentity
+              ? 'Could not create sensors from file (objects may not be loaded). Try Filter → select a group/tag to load objects, then import again.'
+              : `This file has ${normalized.length} panel(s) but no sensor details. Add ${normalized.length} sensors first: use the left panel (Filter → Objects → pick sensors → Add to list) in the order you want them on the dashboard, then import again.`
+          );
+        } else {
+          setError(
+            currentConfigured.length < normalized.length
+              ? `Not enough configured sensors: file has ${normalized.length} panels, you have ${currentConfigured.length}. Add ${normalized.length - currentConfigured.length} more in the same order, then import again.`
+              : 'No panels could be matched. Add the same sensors to "Configured sensors" in the same order as the dashboard, then import again.'
+          );
+        }
         return;
       }
       if (useLocalConfig) {
         const newPlanes: DashboardPlane[] = [];
         matched.forEach((m, i) => {
-          const c = configured.find((x) => x.configured_sensor_id === m.configured_sensor_id);
+          const c = currentConfigured.find((x) => x.configured_sensor_id === m.configured_sensor_id);
           if (!c) return;
           newPlanes.push({
             dashboard_plane_id: -Date.now() - i,
