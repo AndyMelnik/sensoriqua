@@ -18,6 +18,8 @@ After you push to the connected branch (e.g. `main`):
 
 **When to redeploy:** After any frontend or backend code change. The build runs `cd frontend && npm ci && npm run build && cp -r dist/* ../backend/static/` then `cd ../backend && pip install -r requirements.txt`, so both are updated in one deploy.
 
+**Dashboard UI:** The Dashboard section has **Expand** and **Collapse** buttons. **Expand** makes the dashboard fill the entire browser window (hides header and side panels). **Collapse** returns to the normal layout. No backend or env changes required.
+
 ---
 
 ## 1. Single Web Service (API + GUI)

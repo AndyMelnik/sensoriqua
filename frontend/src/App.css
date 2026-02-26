@@ -557,6 +557,41 @@ body {
   flex-shrink: 0;
 }
 
+/* Dashboard expand/collapse – fullscreen mode */
+.app-dashboard-expanded .top-bar,
+.app-dashboard-expanded .global-error,
+.app-dashboard-expanded .main-layout .left-panel,
+.app-dashboard-expanded .main-layout .center-panel {
+  display: none !important;
+}
+
+.app-dashboard-expanded .main-layout {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.app-dashboard-expanded .dashboard-panel-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  padding: 1rem;
+  background: var(--bg);
+}
+
+.app-dashboard-expanded .dashboard-panel-expanded .dashboard-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+@media (min-width: 1200px) {
+  .app-dashboard-expanded .dashboard-panel-expanded .dashboard-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
+
 /* Dashboard – fills remaining width and resizes with viewport */
 .dashboard-panel {
   width: 100%;
@@ -578,6 +613,13 @@ body {
   gap: 1rem;
   flex-wrap: wrap;
   margin-bottom: 0.25rem;
+}
+
+.dashboard-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .dashboard-panel h4 {

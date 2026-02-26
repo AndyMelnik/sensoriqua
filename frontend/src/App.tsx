@@ -94,6 +94,7 @@ export default function App() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportDashboardName, setExportDashboardName] = useState('');
   const [historyPlane, setHistoryPlane] = useState<DashboardPlane | null>(null);
+  const [dashboardExpanded, setDashboardExpanded] = useState(false);
   const [historyDurationHours, setHistoryDurationHours] = useState<api.SensorHistoryHours>(1);
   const [historyData, setHistoryData] = useState<{ ts: string; value: number | null }[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -886,7 +887,7 @@ export default function App() {
   };
 
   return (
-    <div className="app">
+    <div className={`app${dashboardExpanded ? ' app-dashboard-expanded' : ''}`}>
       <header className="top-bar">
         <div className="top-bar-brand">
           <div className="top-bar-title">Sensoriqua</div>
@@ -1226,20 +1227,43 @@ export default function App() {
           </section>
         </div>
 
-        <div className="dashboard-panel">
+        <div className={`dashboard-panel${dashboardExpanded ? ' dashboard-panel-expanded' : ''}`}>
           <div className="dashboard-panel-header">
             <h4>Dashboard</h4>
-            <div className="dashboard-update-duration">
-              <label>Update every</label>
-              <select
-                value={dashboardUpdateSeconds}
-                onChange={(e) => setDashboardUpdateSeconds(Number(e.target.value))}
-                aria-label="Dashboard update interval"
-              >
-                <option value={30}>30 sec</option>
-                <option value={60}>1 min</option>
-                <option value={300}>5 min</option>
-              </select>
+            <div className="dashboard-panel-actions">
+              {dashboardExpanded ? (
+                <button
+                  type="button"
+                  className="btn-sm"
+                  onClick={() => setDashboardExpanded(false)}
+                  title="Collapse to normal view"
+                  aria-label="Collapse dashboard"
+                >
+                  Collapse
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-sm"
+                  onClick={() => setDashboardExpanded(true)}
+                  title="Expand to full window"
+                  aria-label="Expand dashboard"
+                >
+                  Expand
+                </button>
+              )}
+              <div className="dashboard-update-duration">
+                <label>Update every</label>
+                <select
+                  value={dashboardUpdateSeconds}
+                  onChange={(e) => setDashboardUpdateSeconds(Number(e.target.value))}
+                  aria-label="Dashboard update interval"
+                >
+                  <option value={30}>30 sec</option>
+                  <option value={60}>1 min</option>
+                  <option value={300}>5 min</option>
+                </select>
+              </div>
             </div>
           </div>
           {dashboardPlanes.length > 0 && <p className="hint">Sensors added from the list appear here. Values update periodically.</p>}

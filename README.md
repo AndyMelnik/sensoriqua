@@ -73,6 +73,7 @@ Web UI to configure and monitor sensors: filter objects by **Groups**, **Tags**,
 ### Dashboard (right)
 
 - Panels for each added sensor: **object label**, **sensor label**, **latest value**, **timestamp**, and a sparkline. Values are **green** when within MIN/MAX, **red** when outside.
+- **Expand** — make the dashboard fill the entire browser window (hides header and side panels). **Collapse** — return to normal layout.
 - **Update interval:** 30 sec, 1 min, or 5 min (configurable).
 - **Click a panel** to open a **history chart** (1, 4, 12, or 24 hours).
 - **Remove** a panel from the dashboard (sensor stays in configured list).
