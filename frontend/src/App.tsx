@@ -656,7 +656,7 @@ export default function App() {
       let currentConfigured = [...configured];
       if (hasAnyIdentity) {
         try {
-          let objectsList = preloadedObjectsRef.current;
+          let objectsList: { id: number; label: string; device_id: number }[] | null = preloadedObjectsRef.current;
           if (objectsList == null) {
             objectsList = (await api.getObjects({ include_grouping_info: true })) as { id: number; label: string; device_id: number }[];
             preloadedObjectsRef.current = objectsList;
@@ -676,26 +676,27 @@ export default function App() {
           }
           for (const p of toAdd) {
             const obj = p.device_id != null ? deviceToObject[p.device_id] : null;
-            if (!obj) continue;
+            const objectId = obj?.object_id ?? p.device_id!;
+            const objectLabel = obj?.object_label ?? p.object_label ?? '';
             const customLabel = (p.object_label || p.sensor_input_label || 'Sensor').slice(0, 100);
             if (useLocalConfig) {
               const newId = -Date.now() - Math.floor(Math.random() * 1e6);
               const newC: ConfiguredSensor = {
                 configured_sensor_id: newId,
-                object_id: obj.object_id,
+                object_id: objectId,
                 device_id: p.device_id!,
                 sensor_input_label: p.sensor_input_label!,
                 sensor_source: p.sensor_source || 'input',
                 sensor_label_custom: customLabel,
                 min_threshold: null,
                 max_threshold: null,
-                object_label: obj.object_label,
+                object_label: objectLabel,
               };
               currentConfigured = [...currentConfigured, newC];
               api.setLocalConfiguredSensors(currentConfigured);
             } else {
               await api.addConfiguredSensor({
-                object_id: obj.object_id,
+                object_id: objectId,
                 device_id: p.device_id!,
                 sensor_input_label: p.sensor_input_label!,
                 sensor_source: (p.sensor_source as 'input' | 'state' | 'tracking') || 'input',
@@ -712,8 +713,38 @@ export default function App() {
           }
           setConfigured(currentConfigured);
         } catch (e) {
-          setError(e instanceof Error ? e.message : String(e));
-          return;
+          const errMsg = e instanceof Error ? e.message : String(e);
+          const isAppStateError = errMsg.includes('table not found') || errMsg.includes('Configured sensors') || errMsg.includes('app_sensoriqua') ||
+            (e instanceof api.ApiError && e.debug?.status === 503);
+          if (isAppStateError && hasAnyIdentity) {
+            setUseLocalConfig(true);
+            currentConfigured = [];
+            const seen = new Set<string>();
+            for (const p of normalized) {
+              if (p.device_id == null || !p.sensor_input_label) continue;
+              const key = `${p.device_id}:${p.sensor_input_label}:${p.sensor_source || 'input'}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              const newId = -Date.now() - Math.floor(Math.random() * 1e6);
+              const customLabel = (p.object_label || p.sensor_input_label || 'Sensor').slice(0, 100);
+              currentConfigured.push({
+                configured_sensor_id: newId,
+                object_id: p.device_id,
+                device_id: p.device_id!,
+                sensor_input_label: p.sensor_input_label!,
+                sensor_source: p.sensor_source || 'input',
+                sensor_label_custom: customLabel,
+                min_threshold: null,
+                max_threshold: null,
+                object_label: p.object_label ?? '',
+              });
+            }
+            api.setLocalConfiguredSensors(currentConfigured);
+            setConfigured(currentConfigured);
+          } else {
+            setError(errMsg);
+            return;
+          }
         }
       }
       const matched: { configured_sensor_id: number; position_index: number }[] = [];
