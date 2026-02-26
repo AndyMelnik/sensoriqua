@@ -645,13 +645,17 @@ export default function App() {
         return;
       }
       const hasAnyIdentity = normalized.some((p) => p.device_id != null && p.sensor_input_label);
-      let currentConfigured = configured;
+      let currentConfigured = [...configured];
       if (hasAnyIdentity) {
         try {
-          const objectsList = await api.getObjects({ include_grouping_info: true });
+          const objectsList = (await api.getObjects({ include_grouping_info: true })) as { id: number; label: string; device_id: number }[];
           const deviceToObject: Record<number, { object_id: number; object_label: string }> = {};
-          for (const o of objectsList as { id: number; label: string; device_id: number }[]) {
-            if (o.device_id != null) deviceToObject[o.device_id] = { object_id: o.id, object_label: o.label || '' };
+          for (const o of objectsList) {
+            if (o?.device_id != null) deviceToObject[o.device_id] = { object_id: o.id, object_label: o.label || '' };
+          }
+          if (Object.keys(deviceToObject).length === 0) {
+            setError('No objects in database. Use the left panel (Filter → select a group or tag) to load objects, then import again.');
+            return;
           }
           const seen = new Set<string>();
           const toAdd: NormalizedPlane[] = [];
@@ -717,14 +721,14 @@ export default function App() {
         if (currentConfigured.length === 0) {
           setError(
             hasAnyIdentity
-              ? 'Could not create sensors from file (objects may not be loaded). Try Filter → select a group/tag to load objects, then import again.'
-              : `This file has ${normalized.length} panel(s) but no sensor details. Add ${normalized.length} sensors first: use the left panel (Filter → Objects → pick sensors → Add to list) in the order you want them on the dashboard, then import again.`
+              ? 'Could not create sensors from file. Use the left panel (Filter → select a group or tag) to load objects from your database, then import again. Or re-export the dashboard from this app and use that file (it includes sensor details).'
+              : `This file has ${normalized.length} panel(s) but no sensor details, so it can't be imported on a fresh start. Re-export the dashboard from this app (Export includes sensor details), then import that file here. Or add ${normalized.length} sensors manually (Filter → Objects → pick sensors → Add to list) in the order you want, then import again.`
           );
         } else {
           setError(
             currentConfigured.length < normalized.length
-              ? `Not enough configured sensors: file has ${normalized.length} panels, you have ${currentConfigured.length}. Add ${normalized.length - currentConfigured.length} more in the same order, then import again.`
-              : 'No panels could be matched. Add the same sensors to "Configured sensors" in the same order as the dashboard, then import again.'
+              ? `File has ${normalized.length} panels, you have ${currentConfigured.length} configured sensors. Add ${normalized.length - currentConfigured.length} more in the same order, then import again. Or re-export the dashboard from this app and use that file.`
+              : 'Panels in the file do not match your configured sensors. Re-export the dashboard from this app and import that file so dashboard and Configured sensors stay in sync.'
           );
         }
         return;
@@ -749,6 +753,7 @@ export default function App() {
           });
         });
         api.setLocalDashboardPlanes(newPlanes);
+        await loadConfigured();
         await loadDashboard();
         if (matched.length < normalized.length) {
           setError(`Imported ${matched.length} panel(s). ${normalized.length - matched.length} skipped (no matching sensor in your list).`);
@@ -762,6 +767,7 @@ export default function App() {
         const m = matched[i];
         await api.addDashboardPlane(m.configured_sensor_id, m.position_index);
       }
+      await loadConfigured();
       await loadDashboard();
       if (matched.length < normalized.length) {
         setError(`Imported ${matched.length} panel(s). ${normalized.length - matched.length} skipped (no matching sensor in your list).`);
