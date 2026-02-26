@@ -8,6 +8,16 @@ Sensoriqua is a **single application**: one Web Service serves both the **API** 
 
 ---
 
+## Redeploy to latest commit
+
+After you push to the connected branch (e.g. `main`):
+
+1. **Auto-deploy (default):** If auto-deploy is enabled, Render deploys automatically. Check the [Render Dashboard](https://dashboard.render.com/) → your service → **Events** to see the deploy status.
+2. **Manual redeploy:** In the Render Dashboard → your service → **Manual Deploy** → **Deploy latest commit**. This rebuilds both frontend and backend from the latest code.
+3. **Verify:** The single Web Service builds the frontend and backend together. One deploy updates both. After deploy, the GUI at `/` and API at `/api/*` serve the latest version.
+
+---
+
 ## 1. Single Web Service (API + GUI)
 
 ### Option A: Use the Blueprint (render.yaml)
