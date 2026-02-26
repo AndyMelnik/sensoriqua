@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 
 type Point = { ts: string; value: number | null };
 
-const Y_AXIS_WIDTH = 44;
+const Y_AXIS_WIDTH = 72;
 const X_PADDING = 8;
 const Y_PADDING_TOP = 12;
 const Y_PADDING_BOTTOM = 28;
@@ -19,8 +19,9 @@ function formatTime(ts: string): string {
 
 function formatValue(v: number): string {
   const abs = Math.abs(v);
-  if (abs >= 1e6 || (abs < 1e-3 && abs > 0)) return v.toExponential(2);
-  return v.toLocaleString(undefined, { maximumFractionDigits: 4, minimumFractionDigits: 0 });
+  if (abs >= 1e6 || (abs < 1e-3 && abs > 0)) return v.toExponential(1);
+  const s = v.toLocaleString(undefined, { maximumFractionDigits: 4, minimumFractionDigits: 0 });
+  return s.length > 10 ? (abs >= 1000 ? v.toExponential(1) : v.toFixed(2)) : s;
 }
 
 /** Downsample to at most MAX_POINTS for smoother drawing */
@@ -67,15 +68,19 @@ export const HistoryChart = React.memo(function HistoryChart({
     const h = height - Y_PADDING_TOP - Y_PADDING_BOTTOM;
     const chartLeft = Y_AXIS_WIDTH;
 
+    const yMin = Y_PADDING_TOP;
+    const yMax = Y_PADDING_TOP + h;
+    const clampY = (y: number) => Math.max(yMin, Math.min(yMax, y));
+
     const points = plotV
       .map((v, i) => {
         const x = chartLeft + (i / Math.max(plotV.length - 1, 1)) * w;
-        const y = Y_PADDING_TOP + h - ((v - minVal) / range) * h;
+        const y = clampY(Y_PADDING_TOP + h - ((v - minVal) / range) * h);
         return `${x},${y}`;
       })
       .join(' ');
 
-    const yAt = (v: number) => Y_PADDING_TOP + h - ((v - minVal) / range) * h;
+    const yAt = (v: number) => clampY(Y_PADDING_TOP + h - ((v - minVal) / range) * h);
 
     const gridPathParts: string[] = [];
     for (let i = 1; i < GRID_LINES_X; i++) {

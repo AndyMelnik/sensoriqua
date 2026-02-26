@@ -836,7 +836,7 @@ body {
 }
 
 .history-modal {
-  max-width: 600px;
+  max-width: 640px;
 }
 
 .history-chart-wrap {
@@ -844,7 +844,13 @@ body {
   min-height: 200px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  overflow: visible;
+}
+
+.history-chart-wrap svg.history-chart {
+  flex-shrink: 0;
+  overflow: visible;
 }
 
 .history-chart-empty {
