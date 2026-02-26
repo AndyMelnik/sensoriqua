@@ -187,6 +187,14 @@ export default function App() {
     }
     try {
       const list = await api.getConfiguredSensors();
+      if (list.length === 0) {
+        const local = api.getLocalConfiguredSensors() as ConfiguredSensor[];
+        if (local.length > 0) {
+          setUseLocalConfig(true);
+          setConfigured(local);
+          return;
+        }
+      }
       setConfigured(list);
     } catch (e) {
       const is503 = e instanceof api.ApiError && e.debug?.status === 503;
@@ -209,6 +217,14 @@ export default function App() {
     }
     try {
       const list = await api.getDashboardPlanes();
+      if (list.length === 0) {
+        const local = api.getLocalDashboardPlanes() as DashboardPlane[];
+        if (local.length > 0) {
+          setUseLocalConfig(true);
+          setDashboardPlanes(local);
+          return;
+        }
+      }
       setDashboardPlanes(list);
     } catch (e) {
       const is503 = e instanceof api.ApiError && e.debug?.status === 503;
