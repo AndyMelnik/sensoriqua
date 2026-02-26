@@ -10,6 +10,7 @@ export type ConfigForm = {
   sensor_label_custom: string;
   min_threshold: string;
   max_threshold: string;
+  multiplier: string;
 };
 
 export function ConfigModal({
@@ -38,7 +39,12 @@ export function ConfigModal({
       alert('Sensor label is required');
       return;
     }
-    onSave({ ...form, min_threshold: form.min_threshold, max_threshold: form.max_threshold });
+    const mult = form.multiplier.trim() ? parseFloat(form.multiplier) : null;
+    if (mult != null && (Number.isNaN(mult) || mult === 0)) {
+      alert('Multiplier must be a non-zero number');
+      return;
+    }
+    onSave({ ...form, min_threshold: form.min_threshold, max_threshold: form.max_threshold, multiplier: form.multiplier });
   };
 
   return (
@@ -82,6 +88,17 @@ export function ConfigModal({
               value={form.max_threshold}
               onChange={(e) => setForm((f) => ({ ...f, max_threshold: e.target.value }))}
               placeholder="Max"
+            />
+          </div>
+          <div className="form-row">
+            <label>Multiplier (optional)</label>
+            <input
+              type="number"
+              step="any"
+              value={form.multiplier}
+              onChange={(e) => setForm((f) => ({ ...f, multiplier: e.target.value }))}
+              placeholder="1"
+              title="Scale raw values (e.g. 0.001 for millivolts to volts)"
             />
           </div>
           <div className="modal-actions">

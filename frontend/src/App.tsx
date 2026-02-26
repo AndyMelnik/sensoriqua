@@ -36,6 +36,7 @@ type ConfiguredSensor = {
   sensor_label_custom: string;
   min_threshold: number | null;
   max_threshold: number | null;
+  multiplier?: number | null;
   object_label: string;
   created_at?: string;
 };
@@ -50,6 +51,7 @@ type DashboardPlane = {
   sensor_label_custom: string;
   min_threshold: number | null;
   max_threshold: number | null;
+  multiplier?: number | null;
   object_label: string;
 };
 
@@ -58,6 +60,12 @@ const GROUPING_LABELS: Record<GroupingType, string> = {
   tags: 'Tags',
   sensor_types: 'Sensor type',
 };
+
+function scaleValue(v: number | null, mult: number | null | undefined): number | null {
+  if (v == null) return null;
+  const m = mult ?? 1;
+  return v * m;
+}
 
 export default function App() {
   const [groupingType, setGroupingType] = useState<GroupingType>('groups');
@@ -291,7 +299,10 @@ export default function App() {
         historyDurationHours
       )
       .then((res) => {
-        if (!cancelled) setHistoryData(res.series || []);
+        if (!cancelled) {
+          const raw = res.series || [];
+          setHistoryData(raw.map((d) => ({ ...d, value: scaleValue(d.value, historyPlane.multiplier) })));
+        }
       })
       .catch(() => {
         if (!cancelled) setHistoryData([]);
@@ -358,6 +369,7 @@ export default function App() {
       sensor_label_custom: sensor.label || sensor.input_label,
       min_threshold: '',
       max_threshold: '',
+      multiplier: '',
     });
   };
 
@@ -373,6 +385,7 @@ export default function App() {
       sensor_label_custom: c.sensor_label_custom,
       min_threshold: c.min_threshold != null ? String(c.min_threshold) : '',
       max_threshold: c.max_threshold != null ? String(c.max_threshold) : '',
+      multiplier: c.multiplier != null ? String(c.multiplier) : '',
     });
   };
 
@@ -381,6 +394,7 @@ export default function App() {
     setDebugInfo(null);
     const minVal = form.min_threshold.trim() ? parseFloat(form.min_threshold) : null;
     const maxVal = form.max_threshold.trim() ? parseFloat(form.max_threshold) : null;
+    const multVal = form.multiplier.trim() ? parseFloat(form.multiplier) : null;
     const source = (form.sensor_source as 'input' | 'state' | 'tracking') || 'input';
 
     if (useLocalConfig) {
@@ -388,7 +402,7 @@ export default function App() {
       if (editingConfigId) {
         const out = list.map((c) =>
           c.configured_sensor_id === editingConfigId
-            ? { ...c, sensor_label_custom: form.sensor_label_custom, min_threshold: minVal, max_threshold: maxVal }
+            ? { ...c, sensor_label_custom: form.sensor_label_custom, min_threshold: minVal, max_threshold: maxVal, multiplier: multVal }
             : c
         );
         api.setLocalConfiguredSensors(out);
@@ -403,6 +417,7 @@ export default function App() {
           sensor_label_custom: form.sensor_label_custom,
           min_threshold: minVal,
           max_threshold: maxVal,
+          multiplier: multVal,
           object_label: form.object_label,
         });
         api.setLocalConfiguredSensors(list);
@@ -419,6 +434,7 @@ export default function App() {
           sensor_label_custom: form.sensor_label_custom,
           min_threshold: minVal,
           max_threshold: maxVal,
+          multiplier: multVal,
         });
       } else {
         await api.addConfiguredSensor({
@@ -429,6 +445,7 @@ export default function App() {
           sensor_label_custom: form.sensor_label_custom,
           min_threshold: minVal,
           max_threshold: maxVal,
+          multiplier: multVal,
         });
       }
       setConfigModal(null);
@@ -442,7 +459,7 @@ export default function App() {
         if (editingConfigId) {
           const out = list.map((c) =>
             c.configured_sensor_id === editingConfigId
-              ? { ...c, sensor_label_custom: form.sensor_label_custom, min_threshold: minVal, max_threshold: maxVal }
+              ? { ...c, sensor_label_custom: form.sensor_label_custom, min_threshold: minVal, max_threshold: maxVal, multiplier: multVal }
               : c
           );
           api.setLocalConfiguredSensors(out);
@@ -456,6 +473,7 @@ export default function App() {
             sensor_label_custom: form.sensor_label_custom,
             min_threshold: minVal,
             max_threshold: maxVal,
+            multiplier: multVal,
             object_label: form.object_label,
           });
           api.setLocalConfiguredSensors(list);
@@ -706,6 +724,7 @@ export default function App() {
                 sensor_label_custom: customLabel,
                 min_threshold: null,
                 max_threshold: null,
+                multiplier: null,
                 object_label: objectLabel,
               };
               currentConfigured = [...currentConfigured, newC];
@@ -719,6 +738,7 @@ export default function App() {
                 sensor_label_custom: customLabel,
                 min_threshold: null,
                 max_threshold: null,
+                multiplier: null,
               });
             }
           }
@@ -752,6 +772,7 @@ export default function App() {
                 sensor_label_custom: customLabel,
                 min_threshold: null,
                 max_threshold: null,
+                multiplier: null,
                 object_label: p.object_label ?? '',
               });
             }
@@ -1129,7 +1150,8 @@ export default function App() {
             <div className="configured-cards">
               {configured.map((c) => {
                 const key = sparkKey(c.device_id, c.sensor_input_label, c.sensor_source || 'input');
-                const data = sparklineData[key] || [];
+                const rawData = sparklineData[key] || [];
+                const data = rawData.map((d) => ({ ...d, value: scaleValue(d.value, c.multiplier) }));
                 const isOnDashboard = dashboardPlanes.some((p) => p.configured_sensor_id === c.configured_sensor_id);
                 return (
                   <div key={c.configured_sensor_id} className={`configured-card${isOnDashboard ? ' configured-card-on-dashboard' : ''}`}>
@@ -1214,9 +1236,11 @@ export default function App() {
             ) : dashboardPlanes.map((p) => {
               const key = sparkKey(p.device_id, p.sensor_input_label, p.sensor_source || 'input');
               const latest = dashboardValues[key];
-              const val = latest?.value ?? null;
+              const rawVal = latest?.value ?? null;
+              const val = scaleValue(rawVal, p.multiplier);
               const ok = inThreshold(val, p.min_threshold, p.max_threshold);
-              const data = sparklineData[key] || [];
+              const rawData = sparklineData[key] || [];
+              const data = rawData.map((d) => ({ ...d, value: scaleValue(d.value, p.multiplier) }));
               return (
                 <div
                   key={p.dashboard_plane_id}

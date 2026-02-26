@@ -135,6 +135,7 @@ export async function addConfiguredSensor(body: {
   sensor_label_custom: string;
   min_threshold?: number | null;
   max_threshold?: number | null;
+  multiplier?: number | null;
 }) {
   const url = `${API_BASE}/api/configured-sensors`;
   const r = await fetch(url, {
@@ -165,7 +166,7 @@ export async function addConfiguredSensor(body: {
   return JSON.parse(responseBody);
 }
 
-export async function updateConfiguredSensor(id: number, body: { sensor_label_custom?: string; min_threshold?: number | null; max_threshold?: number | null }) {
+export async function updateConfiguredSensor(id: number, body: { sensor_label_custom?: string; min_threshold?: number | null; max_threshold?: number | null; multiplier?: number | null }) {
   const r = await fetch(`${API_BASE}/api/configured-sensors/${id}`, {
     method: 'PATCH',
     headers: headers(),

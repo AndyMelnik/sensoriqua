@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS configured_sensors (
   sensor_label_custom VARCHAR(100) NOT NULL,
   min_threshold REAL NULL,
   max_threshold REAL NULL,
+  multiplier REAL NULL,
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -153,11 +154,21 @@ class _SqliteConnWrapper:
         self._conn.close()
 
 
+def _migrate_sqlite_multiplier(conn: sqlite3.Connection) -> None:
+    """Add multiplier column to configured_sensors if missing (for existing DBs)."""
+    cur = conn.execute("PRAGMA table_info(configured_sensors)")
+    cols = [row[1] for row in cur.fetchall()]
+    if "multiplier" not in cols:
+        conn.execute("ALTER TABLE configured_sensors ADD COLUMN multiplier REAL NULL")
+        conn.commit()
+
+
 def _open_sqlite_app_state(path: Path) -> _SqliteConnWrapper:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
     conn.executescript(_SQLITE_SCHEMA)
     conn.commit()
+    _migrate_sqlite_multiplier(conn)
     return _SqliteConnWrapper(conn)
 
 

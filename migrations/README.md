@@ -18,12 +18,14 @@ Your DBA (or anyone with sufficient privileges) must run the migrations **once**
 
 1. **001_app_sensoriqua.sql** – creates schema `app_sensoriqua`, tables `configured_sensors` and `dashboard_planes`.
 2. **002_sensor_source.sql** – adds column `sensor_source` to `configured_sensors`.
+3. **003_multiplier.sql** – adds column `multiplier` to `configured_sensors` (scale raw values).
 
 They can run them with:
 
 ```bash
 psql "$SENSORIQUA_DSN" -f migrations/001_app_sensoriqua.sql
 psql "$SENSORIQUA_DSN" -f migrations/002_sensor_source.sql
+psql "$SENSORIQUA_DSN" -f migrations/003_multiplier.sql
 ```
 
 Or execute the contents of those files in any SQL client connected to the same database.

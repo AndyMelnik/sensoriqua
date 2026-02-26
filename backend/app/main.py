@@ -125,12 +125,14 @@ class ConfiguredSensorCreate(BaseModel):
     sensor_label_custom: str
     min_threshold: float | None = None
     max_threshold: float | None = None
+    multiplier: float | None = None
 
 
 class ConfiguredSensorUpdate(BaseModel):
     sensor_label_custom: str | None = None
     min_threshold: float | None = None
     max_threshold: float | None = None
+    multiplier: float | None = None
 
 
 class DashboardPlaneCreate(BaseModel):
@@ -662,7 +664,7 @@ def list_configured_sensors(ctx: RequestContext = Depends(_request_context)):
                     f"""
                     SELECT configured_sensor_id, object_id, device_id, sensor_input_label,
                            sensor_source, sensor_id, sensor_label_custom, min_threshold, max_threshold,
-                           created_at
+                           multiplier, created_at
                     FROM {cfg}
                     WHERE user_id = %s AND is_active = 1
                     ORDER BY created_at DESC
@@ -687,7 +689,7 @@ def list_configured_sensors(ctx: RequestContext = Depends(_request_context)):
                     f"""
                     SELECT c.configured_sensor_id, c.object_id, c.device_id, c.sensor_input_label,
                            c.sensor_source, c.sensor_id, c.sensor_label_custom, c.min_threshold, c.max_threshold,
-                           c.created_at,
+                           c.multiplier, c.created_at,
                            o.object_label
                     FROM {cfg} c
                     JOIN raw_business_data.objects o ON o.object_id = c.object_id
@@ -712,7 +714,7 @@ def list_configured_sensors(ctx: RequestContext = Depends(_request_context)):
                     (uid,),
                 )
                 rows = cur.fetchall()
-                rows = [{**dict(r), "sensor_source": "input"} for r in rows]
+                rows = [{**dict(r), "sensor_source": "input", "multiplier": None} for r in rows]
             return [dict(r) for r in rows]
     except psycopg.errors.UndefinedTable:
         return []
@@ -739,9 +741,9 @@ def add_configured_sensor(
                 cur = conn.execute(
                     f"""
                     INSERT INTO {cfg}
-                    (user_id, object_id, device_id, sensor_input_label, sensor_source, sensor_id, sensor_label_custom, min_threshold, max_threshold)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING configured_sensor_id, object_id, device_id, sensor_input_label, sensor_source, sensor_label_custom, min_threshold, max_threshold, created_at
+                    (user_id, object_id, device_id, sensor_input_label, sensor_source, sensor_id, sensor_label_custom, min_threshold, max_threshold, multiplier)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING configured_sensor_id, object_id, device_id, sensor_input_label, sensor_source, sensor_label_custom, min_threshold, max_threshold, multiplier, created_at
                     """,
                     (
                         uid,
@@ -753,6 +755,7 @@ def add_configured_sensor(
                         body.sensor_label_custom,
                         body.min_threshold,
                         body.max_threshold,
+                        body.multiplier,
                     ),
                 )
                 row = cur.fetchone()
@@ -761,9 +764,9 @@ def add_configured_sensor(
                     cur = conn.execute(
                         f"""
                         INSERT INTO {cfg}
-                        (user_id, object_id, device_id, sensor_input_label, sensor_source, sensor_id, sensor_label_custom, min_threshold, max_threshold)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        RETURNING configured_sensor_id, object_id, device_id, sensor_input_label, sensor_source, sensor_label_custom, min_threshold, max_threshold, created_at
+                        (user_id, object_id, device_id, sensor_input_label, sensor_source, sensor_id, sensor_label_custom, min_threshold, max_threshold, multiplier)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING configured_sensor_id, object_id, device_id, sensor_input_label, sensor_source, sensor_label_custom, min_threshold, max_threshold, multiplier, created_at
                         """,
                         (
                             uid,
@@ -775,6 +778,7 @@ def add_configured_sensor(
                             body.sensor_label_custom,
                             body.min_threshold,
                             body.max_threshold,
+                            body.multiplier,
                         ),
                     )
                     row = cur.fetchone()
@@ -801,6 +805,7 @@ def add_configured_sensor(
                     if row is not None:
                         row = dict(row)
                         row["sensor_source"] = "input"
+                        row["multiplier"] = None
             if row is None:
                 raise HTTPException(status_code=500, detail="INSERT returned no row")
             conn.commit()
@@ -843,15 +848,19 @@ def update_configured_sensor(
     with get_app_state_conn(dsn, override_dsn=ctx.app_state_dsn) as conn:
         updates = []
         params: list[Any] = []
-        if body.sensor_label_custom is not None:
+        payload = body.model_dump(exclude_unset=True)
+        if "sensor_label_custom" in payload:
             updates.append("sensor_label_custom = %s")
             params.append(body.sensor_label_custom)
-        if body.min_threshold is not None:
+        if "min_threshold" in payload:
             updates.append("min_threshold = %s")
             params.append(body.min_threshold)
-        if body.max_threshold is not None:
+        if "max_threshold" in payload:
             updates.append("max_threshold = %s")
             params.append(body.max_threshold)
+        if "multiplier" in payload:
+            updates.append("multiplier = %s")
+            params.append(body.multiplier)
         if not updates:
             raise HTTPException(400, "No fields to update")
         updates.append(f"updated_at = {updated_at}")
@@ -1086,7 +1095,7 @@ def list_dashboard_planes(ctx: RequestContext = Depends(_request_context)):
                     f"""
                     SELECT d.dashboard_plane_id, d.configured_sensor_id, d.position_index,
                            c.object_id, c.device_id, c.sensor_input_label, c.sensor_source, c.sensor_label_custom,
-                           c.min_threshold, c.max_threshold
+                           c.min_threshold, c.max_threshold, c.multiplier
                     FROM {dp} d
                     JOIN {cfg} c ON c.configured_sensor_id = d.configured_sensor_id AND c.is_active = {is_active}
                     WHERE d.user_id = %s
@@ -1112,7 +1121,7 @@ def list_dashboard_planes(ctx: RequestContext = Depends(_request_context)):
                     f"""
                     SELECT d.dashboard_plane_id, d.configured_sensor_id, d.position_index,
                            c.object_id, c.device_id, c.sensor_input_label, c.sensor_source, c.sensor_label_custom,
-                           c.min_threshold, c.max_threshold,
+                           c.min_threshold, c.max_threshold, c.multiplier,
                            o.object_label
                     FROM {dp} d
                     JOIN {cfg} c ON c.configured_sensor_id = d.configured_sensor_id AND c.is_active = true
@@ -1139,7 +1148,7 @@ def list_dashboard_planes(ctx: RequestContext = Depends(_request_context)):
                     (uid,),
                 )
                 rows = cur.fetchall()
-                rows = [{**dict(r), "sensor_source": "input"} for r in rows]
+                rows = [{**dict(r), "sensor_source": "input", "multiplier": None} for r in rows]
             return [dict(r) for r in rows]
     except psycopg.errors.UndefinedTable:
         return []
