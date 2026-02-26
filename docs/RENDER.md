@@ -1,8 +1,10 @@
 # Deploying Sensoriqua on Render.com
 
-Sensoriqua is a **single application**: one Web Service serves both the **API** and the **GUI** at the same URL. The frontend is pre-built and committed in `backend/static/`; no Node/npm is required on Render.
+Sensoriqua is a **single application**: one Web Service serves both the **API** and the **GUI** at the same URL. The frontend is built from source during deploy (see `render.yaml`); `backend/static/` is populated by the build.
 
 **Data source:** When using **Navixy App Connect**, the database connection (iotDbUrl) is provided by the Navixy auth service per user at login. You do **not** need Render Postgres or any shared database for telematics data.
+
+**Deploy readiness:** Ensure `frontend/package-lock.json` exists (required for `npm ci`). The build runs `cd frontend && npm ci && npm run build && cp -r dist/* ../backend/static/` then `cd ../backend && pip install -r requirements.txt`.
 
 ---
 
@@ -36,8 +38,8 @@ To restrict which sites may embed the app, set **ALLOW_FRAME_ORIGINS** to comma-
 
 ### App state and database
 
-- **With Navixy App Connect:** Telematics use **iotDbUrl** and app state (configured sensors, dashboard) use **userDbUrl** from the auth service. No Render Postgres required.
-- **Standalone:** Set **SENSORIQUA_DSN** to your PostgreSQL for telematics. App state uses **SQLite** at `backend/sensoriqua_state.db` by default (no migrations needed). The blueprint sets **SENSORIQUA_APP_STATE_DSN** so import/configured sensors work on Render. *Note: Render's default filesystem is ephemeral; SQLite data is lost on restart. For persistence, add a [Persistent Disk](https://render.com/docs/disks) or use Postgres for app state.*
+- **With Navixy App Connect:** Telematics use **iotDbUrl** and app state (configured sensors, dashboard) use **userDbUrl** from the auth service. No Render Postgres required. If using Postgres for app state (userDbUrl), run `migrations/003_multiplier.sql` once to add the multiplier column.
+- **Standalone:** Set **SENSORIQUA_DSN** to your PostgreSQL for telematics. App state uses **SQLite** at `backend/sensoriqua_state.db` by default (no migrations needed). The blueprint sets **SENSORIQUA_APP_STATE_DSN** so import/configured sensors work on Render. SQLite auto-migrates the multiplier column. *Note: Render's default filesystem is ephemeral; SQLite data is lost on restart. For persistence, add a [Persistent Disk](https://render.com/docs/disks) or use Postgres for app state.*
 - **When app state is unavailable (e.g. 503):** The frontend falls back to **localStorage** for the configured-sensors list and dashboard in that browser; the UI shows “Saved in this browser.”
 
 ---
