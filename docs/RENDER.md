@@ -23,7 +23,7 @@ Sensoriqua is a **single application**: one Web Service serves both the **API** 
    - **Root Directory:** leave empty
    - **Build Command:** `cd frontend && npm ci && npm run build && cp -r dist/* ../backend/static/ && cd ../backend && pip install -r requirements.txt`
    - **Start Command:** `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-3. **Environment:** Add `JWT_SECRET` (for Navixy) and/or `SENSORIQUA_DSN` (standalone), **CORS_ORIGINS** if needed.
+3. **Environment:** Add `JWT_SECRET` (for Navixy) and/or `SENSORIQUA_DSN` (standalone), **CORS_ORIGINS** if needed. The blueprint sets `SENSORIQUA_APP_STATE_DSN=sqlite:///./sensoriqua_state.db` so configured sensors and dashboard work without Postgres migrations.
 4. Deploy. The same URL serves the GUI (/) and the API (/api/*, /docs). The frontend is built from source on each deploy, so GUI changes in the repo are included automatically.
 
 **If the build fails** (e.g. Node not available in the build environment): use Build Command `cd backend && pip install -r requirements.txt` and commit the built frontend before deploy: run `cd frontend && npm run build && cp -r dist/* ../backend/static/` locally, then commit `backend/static/`.
@@ -37,7 +37,7 @@ To restrict which sites may embed the app, set **ALLOW_FRAME_ORIGINS** to comma-
 ### App state and database
 
 - **With Navixy App Connect:** Telematics use **iotDbUrl** and app state (configured sensors, dashboard) use **userDbUrl** from the auth service. No Render Postgres required.
-- **Standalone:** Set **SENSORIQUA_DSN** to your PostgreSQL for telematics. App state uses **SQLite** at `backend/sensoriqua_state.db` by default (no migrations needed). Optionally set **SENSORIQUA_APP_STATE_DSN** to a custom path.
+- **Standalone:** Set **SENSORIQUA_DSN** to your PostgreSQL for telematics. App state uses **SQLite** at `backend/sensoriqua_state.db` by default (no migrations needed). The blueprint sets **SENSORIQUA_APP_STATE_DSN** so import/configured sensors work on Render. *Note: Render's default filesystem is ephemeral; SQLite data is lost on restart. For persistence, add a [Persistent Disk](https://render.com/docs/disks) or use Postgres for app state.*
 - **When app state is unavailable (e.g. 503):** The frontend falls back to **localStorage** for the configured-sensors list and dashboard in that browser; the UI shows “Saved in this browser.”
 
 ---

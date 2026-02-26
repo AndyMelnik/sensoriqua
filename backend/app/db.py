@@ -165,19 +165,14 @@ def _open_sqlite_app_state(path: Path) -> _SqliteConnWrapper:
 def get_app_state_conn(main_dsn: str, override_dsn: str | None = None) -> Generator[Any, None, None]:
     """
     Context manager for app_sensoriqua (configured_sensors, dashboard_planes).
-    If override_dsn is set (e.g. Navixy userDbUrl), uses that Postgres for app state.
-    Else if SENSORIQUA_APP_STATE_DSN is set to a sqlite path, uses that SQLite file.
+    If SENSORIQUA_APP_STATE_DSN is set to sqlite, uses that (overrides Navixy userDbUrl).
+    Else if override_dsn is set (e.g. Navixy userDbUrl), uses that Postgres for app state.
     Otherwise uses default SQLite at backend/sensoriqua_state.db (no Postgres schema required).
     Yields a connection with execute(sql, params) and dict rows.
     Table names: SQLite no prefix; Postgres use app_sensoriqua.X (via app_state_table).
     """
     token = None
     try:
-        if override_dsn:
-            token = _app_state_schema.set("postgres")
-            with get_conn(override_dsn) as conn:
-                yield conn
-            return
         if _use_sqlite_app_state():
             path = _sqlite_path()
             if path:
@@ -188,6 +183,11 @@ def get_app_state_conn(main_dsn: str, override_dsn: str | None = None) -> Genera
                 finally:
                     conn_wrapper.close()
                 return
+        if override_dsn:
+            token = _app_state_schema.set("postgres")
+            with get_conn(override_dsn) as conn:
+                yield conn
+            return
         # No override and no APP_STATE_DSN: use default SQLite so app works without app_sensoriqua on main DB
         token = _app_state_schema.set("sqlite")
         conn_wrapper = _open_sqlite_app_state(_DEFAULT_APP_STATE_PATH)
