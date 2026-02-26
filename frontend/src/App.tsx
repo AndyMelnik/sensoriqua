@@ -97,6 +97,7 @@ export default function App() {
     onConfirm: () => void;
   } | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const preloadedObjectsRef = useRef<{ id: number; label: string; device_id: number }[] | null>(null);
 
   const loadGroupings = useCallback(async () => {
     setLoading('groupings');
@@ -132,6 +133,13 @@ export default function App() {
   }, [selectedGroupingIds]);
 
   useEffect(() => { loadObjects(); }, [selectedGroupingIds.groups, selectedGroupingIds.tags, selectedGroupingIds.sensor_types]);
+
+  useEffect(() => {
+    if (preloadedObjectsRef.current != null) return;
+    api.getObjects({ include_grouping_info: true })
+      .then((list) => { preloadedObjectsRef.current = list as { id: number; label: string; device_id: number }[]; })
+      .catch(() => {});
+  }, []);
 
   const loadSensorsForObject = useCallback(async (objectId: number, _deviceId: number) => {
     try {
@@ -648,13 +656,17 @@ export default function App() {
       let currentConfigured = [...configured];
       if (hasAnyIdentity) {
         try {
-          const objectsList = (await api.getObjects({ include_grouping_info: true })) as { id: number; label: string; device_id: number }[];
+          let objectsList = preloadedObjectsRef.current;
+          if (objectsList == null) {
+            objectsList = (await api.getObjects({ include_grouping_info: true })) as { id: number; label: string; device_id: number }[];
+            preloadedObjectsRef.current = objectsList;
+          }
           const deviceToObject: Record<number, { object_id: number; object_label: string }> = {};
           for (const o of objectsList) {
             if (o?.device_id != null) deviceToObject[o.device_id] = { object_id: o.id, object_label: o.label || '' };
           }
           if (Object.keys(deviceToObject).length === 0) {
-            setError('No objects in database. Use the left panel (Filter → select a group or tag) to load objects, then import again.');
+            setError('No objects in database yet. Wait a moment for the app to load objects, or use the left panel (Filter → select a group or tag), then import again.');
             return;
           }
           const seen = new Set<string>();
@@ -721,14 +733,14 @@ export default function App() {
         if (currentConfigured.length === 0) {
           setError(
             hasAnyIdentity
-              ? 'Could not create sensors from file. Use the left panel (Filter → select a group or tag) to load objects from your database, then import again. Or re-export the dashboard from this app and use that file (it includes sensor details).'
-              : `This file has ${normalized.length} panel(s) but no sensor details, so it can't be imported on a fresh start. Re-export the dashboard from this app (Export includes sensor details), then import that file here. Or add ${normalized.length} sensors manually (Filter → Objects → pick sensors → Add to list) in the order you want, then import again.`
+              ? 'Could not create sensors from this file. Load objects first (Filter → select a group or tag), then import again. Use a file exported from Sensoriqua so it includes sensor details.'
+              : `Use a dashboard file exported from Sensoriqua (Export includes sensor details). This file has ${normalized.length} panel(s) but no sensor details, so it can't be imported on a fresh start.`
           );
         } else {
           setError(
             currentConfigured.length < normalized.length
-              ? `File has ${normalized.length} panels, you have ${currentConfigured.length} configured sensors. Add ${normalized.length - currentConfigured.length} more in the same order, then import again. Or re-export the dashboard from this app and use that file.`
-              : 'Panels in the file do not match your configured sensors. Re-export the dashboard from this app and import that file so dashboard and Configured sensors stay in sync.'
+              ? `File has ${normalized.length} panels, you have ${currentConfigured.length} sensors. Add more in the same order and import again, or use a file exported from this app.`
+              : 'This file does not match your sensors. Export your dashboard from this app and import that file.'
           );
         }
         return;
@@ -1141,7 +1153,22 @@ export default function App() {
           </div>
           <p className="hint">Sensors added from the list appear here. Values update periodically.</p>
           <div className="dashboard-grid">
-            {dashboardPlanes.map((p) => {
+            {dashboardPlanes.length === 0 ? (
+              <div className="dashboard-welcome">
+                <p className="dashboard-welcome-title">No dashboard yet</p>
+                <p className="dashboard-welcome-text">
+                  Import a dashboard to get started. Use a JSON file exported from Sensoriqua so it includes sensor details.
+                </p>
+                <button
+                  type="button"
+                  className="btn-sm primary dashboard-welcome-import"
+                  onClick={() => importInputRef.current?.click()}
+                >
+                  Import dashboard
+                </button>
+                <p className="dashboard-welcome-hint">Or add sensors from the left panel, then add them to the dashboard.</p>
+              </div>
+            ) : dashboardPlanes.map((p) => {
               const key = sparkKey(p.device_id, p.sensor_input_label, p.sensor_source || 'input');
               const latest = dashboardValues[key];
               const val = latest?.value ?? null;
