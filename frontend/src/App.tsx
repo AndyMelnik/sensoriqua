@@ -425,6 +425,17 @@ export default function App() {
       setConfigModal(null);
       setEditingConfigId(null);
       loadConfigured();
+      if (editingConfigId) {
+        const planes = api.getLocalDashboardPlanes() as DashboardPlane[];
+        const updated = planes.map((p) =>
+          p.configured_sensor_id === editingConfigId
+            ? { ...p, min_threshold: minVal, max_threshold: maxVal, multiplier: multVal }
+            : p
+        );
+        api.setLocalDashboardPlanes(updated);
+      }
+      loadDashboard();
+      setHistoryPlane((prev) => (prev && prev.configured_sensor_id === editingConfigId ? { ...prev, min_threshold: minVal, max_threshold: maxVal, multiplier: multVal } : prev));
       return;
     }
 
@@ -450,7 +461,9 @@ export default function App() {
       }
       setConfigModal(null);
       setEditingConfigId(null);
-      loadConfigured();
+      await loadConfigured();
+      await loadDashboard();
+      setHistoryPlane((prev) => (prev && prev.configured_sensor_id === editingConfigId ? { ...prev, min_threshold: minVal, max_threshold: maxVal, multiplier: multVal } : prev));
     } catch (e) {
       const is503 = e instanceof api.ApiError && e.debug?.status === 503;
       if (is503) {
@@ -481,6 +494,17 @@ export default function App() {
         setConfigModal(null);
         setEditingConfigId(null);
         setConfigured(api.getLocalConfiguredSensors() as ConfiguredSensor[]);
+        if (editingConfigId) {
+          const planes = api.getLocalDashboardPlanes() as DashboardPlane[];
+          const updated = planes.map((p) =>
+            p.configured_sensor_id === editingConfigId
+              ? { ...p, min_threshold: minVal, max_threshold: maxVal, multiplier: multVal }
+              : p
+          );
+          api.setLocalDashboardPlanes(updated);
+        }
+        loadDashboard();
+        setHistoryPlane((prev) => (prev && prev.configured_sensor_id === editingConfigId ? { ...prev, min_threshold: minVal, max_threshold: maxVal, multiplier: multVal } : prev));
         return;
       }
       const message = e instanceof Error ? e.message : String(e);
@@ -539,6 +563,7 @@ export default function App() {
         sensor_label_custom: c.sensor_label_custom,
         min_threshold: c.min_threshold,
         max_threshold: c.max_threshold,
+        multiplier: c.multiplier,
         object_label: c.object_label,
       });
       api.setLocalDashboardPlanes(planes);
@@ -825,6 +850,7 @@ export default function App() {
             sensor_label_custom: c.sensor_label_custom,
             min_threshold: c.min_threshold,
             max_threshold: c.max_threshold,
+            multiplier: c.multiplier,
             object_label: c.object_label,
           });
         });

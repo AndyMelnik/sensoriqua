@@ -16,6 +16,8 @@ After you push to the connected branch (e.g. `main`):
 2. **Manual redeploy:** In the Render Dashboard → your service → **Manual Deploy** → **Deploy latest commit**. This rebuilds both frontend and backend from the latest code.
 3. **Verify:** The single Web Service builds the frontend and backend together. One deploy updates both. After deploy, the GUI at `/` and API at `/api/*` serve the latest version.
 
+**When to redeploy:** After any frontend or backend code change. The build runs `cd frontend && npm ci && npm run build && cp -r dist/* ../backend/static/` then `cd ../backend && pip install -r requirements.txt`, so both are updated in one deploy.
+
 ---
 
 ## 1. Single Web Service (API + GUI)
