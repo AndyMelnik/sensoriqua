@@ -21,12 +21,12 @@ Sensoriqua is a **single application**: one Web Service serves both the **API** 
 1. **New → Web Service**; connect your repo.
 2. **Settings:**
    - **Root Directory:** leave empty
-   - **Build Command:** `cd backend && pip install -r requirements.txt`
+   - **Build Command:** `cd frontend && npm ci && npm run build && cp -r dist/* ../backend/static/ && cd ../backend && pip install -r requirements.txt`
    - **Start Command:** `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 3. **Environment:** Add `JWT_SECRET` (for Navixy) and/or `SENSORIQUA_DSN` (standalone), **CORS_ORIGINS** if needed.
-4. Deploy. The same URL serves the GUI (/) and the API (/api/*, /docs).
+4. Deploy. The same URL serves the GUI (/) and the API (/api/*, /docs). The frontend is built from source on each deploy, so GUI changes in the repo are included automatically.
 
-**Updating the GUI:** After changing the frontend, run `cd frontend && npm run build && cp -r dist/* ../backend/static/` and commit `backend/static/`.
+**If the build fails** (e.g. Node not available in the build environment): use Build Command `cd backend && pip install -r requirements.txt` and commit the built frontend before deploy: run `cd frontend && npm run build && cp -r dist/* ../backend/static/` locally, then commit `backend/static/`.
 
 ### Embedding in an iframe
 
@@ -53,9 +53,9 @@ If you prefer a separate frontend deployment (e.g. different domain), create a *
 | Item   | Web Service (API + GUI) |
 |--------|--------------------------|
 | Root   | (empty)                  |
-| Build  | `cd backend && pip install -r requirements.txt` |
+| Build  | `cd frontend && npm ci && npm run build && cp -r dist/* ../backend/static/ && cd ../backend && pip install -r requirements.txt` |
 | Start  | `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
-| GUI    | Pre-built in `backend/static/`; served at `/` |
+| GUI    | Built from `frontend/` during deploy → `backend/static/`; served at `/` |
 | Env    | `JWT_SECRET`, `CORS_ORIGINS`, `SENSORIQUA_DSN`, `ALLOW_FRAME_ORIGINS` (for iframe embedding) as needed |
 
 ---

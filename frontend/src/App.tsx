@@ -665,10 +665,6 @@ export default function App() {
           for (const o of objectsList) {
             if (o?.device_id != null) deviceToObject[o.device_id] = { object_id: o.id, object_label: o.label || '' };
           }
-          if (Object.keys(deviceToObject).length === 0) {
-            setError('No objects in database yet. Wait a moment for the app to load objects, or use the left panel (Filter → select a group or tag), then import again.');
-            return;
-          }
           const seen = new Set<string>();
           const toAdd: NormalizedPlane[] = [];
           for (const p of normalized) {
@@ -709,9 +705,9 @@ export default function App() {
               });
             }
           }
-          if (!useLocalConfig && toAdd.length > 0) {
+          if (!useLocalConfig) {
             currentConfigured = await api.getConfiguredSensors();
-          } else if (useLocalConfig) {
+          } else {
             currentConfigured = api.getLocalConfiguredSensors() as ConfiguredSensor[];
           }
           setConfigured(currentConfigured);
@@ -733,8 +729,8 @@ export default function App() {
         if (currentConfigured.length === 0) {
           setError(
             hasAnyIdentity
-              ? 'Could not create sensors from this file. Load objects first (Filter → select a group or tag), then import again. Use a file exported from Sensoriqua so it includes sensor details.'
-              : `Use a dashboard file exported from Sensoriqua (Export includes sensor details). This file has ${normalized.length} panel(s) but no sensor details, so it can't be imported on a fresh start.`
+              ? 'No devices from this file were found in your database. Use the left panel (Filter → select a group or tag) to load objects, then import again. Or check that you are connected to the same database the dashboard was exported from.'
+              : `This file has ${normalized.length} panel(s) but no sensor details. Use a dashboard file exported from Sensoriqua (Export includes sensor details) to import on a fresh start.`
           );
         } else {
           setError(
@@ -1151,7 +1147,7 @@ export default function App() {
               </select>
             </div>
           </div>
-          <p className="hint">Sensors added from the list appear here. Values update periodically.</p>
+          {dashboardPlanes.length > 0 && <p className="hint">Sensors added from the list appear here. Values update periodically.</p>}
           <div className="dashboard-grid">
             {dashboardPlanes.length === 0 ? (
               <div className="dashboard-welcome">
