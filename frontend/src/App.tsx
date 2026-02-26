@@ -1282,8 +1282,8 @@ export default function App() {
               ) : (
                 <HistoryChart
                   data={historyData}
-                  width={560}
-                  height={260}
+                  width={520}
+                  height={220}
                   showThresholds
                   min={historyPlane.min_threshold}
                   max={historyPlane.max_threshold}

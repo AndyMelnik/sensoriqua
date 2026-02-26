@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 
 type Point = { ts: string; value: number | null };
 
-const Y_AXIS_WIDTH = 72;
+const Y_AXIS_WIDTH = 96;
 const X_PADDING = 8;
 const Y_PADDING_TOP = 12;
 const Y_PADDING_BOTTOM = 28;
