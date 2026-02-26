@@ -8,6 +8,20 @@ Sensoriqua is a **single application**: one Web Service serves both the **API** 
 
 ---
 
+## Front-end and backend deployment (Render.com)
+
+One Render Web Service deploys **both** front-end and backend:
+
+1. **Connect the repo** (e.g. GitHub) and use the branch you push to (e.g. `main`).
+2. **Build command** (from repo root):  
+   `cd frontend && npm ci && npm run build && cp -r dist/* ../backend/static/ && cd ../backend && pip install -r requirements.txt`
+3. **Start command:**  
+   `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+4. **Redeploy after code changes:** Push to the connected branch; if auto-deploy is on, Render builds and deploys. Otherwise use **Manual Deploy** → **Deploy latest commit** in the [Render Dashboard](https://dashboard.render.com/).
+5. **Result:** The same URL serves the GUI at `/` and the API at `/api/*` and `/docs`. No separate front-end or backend service is required.
+
+---
+
 ## Redeploy to latest commit
 
 After you push to the connected branch (e.g. `main`):

@@ -622,6 +622,11 @@ body {
   flex-wrap: wrap;
 }
 
+.dashboard-expand-toggle {
+  font-weight: 600;
+  min-width: 5rem;
+}
+
 .dashboard-panel h4 {
   margin: 0;
   font-size: 0.95rem;

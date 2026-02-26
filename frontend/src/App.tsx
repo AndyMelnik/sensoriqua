@@ -1234,7 +1234,7 @@ export default function App() {
               {dashboardExpanded ? (
                 <button
                   type="button"
-                  className="btn-sm"
+                  className="btn-sm primary dashboard-expand-toggle"
                   onClick={() => setDashboardExpanded(false)}
                   title="Collapse to normal view"
                   aria-label="Collapse dashboard"
@@ -1244,7 +1244,7 @@ export default function App() {
               ) : (
                 <button
                   type="button"
-                  className="btn-sm"
+                  className="btn-sm primary dashboard-expand-toggle"
                   onClick={() => setDashboardExpanded(true)}
                   title="Expand to full window"
                   aria-label="Expand dashboard"
